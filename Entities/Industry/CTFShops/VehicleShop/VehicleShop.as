@@ -49,13 +49,14 @@ void onInit(CBlob@ this)
 		AddRequirement(s.requirements, "coin", "", "Coins", CTFCosts::ballista_ammo);
 	}
 	{
-		ShopItem@ s = addShopItem(this, "Bomb Bolt Upgrade", "$vehicleshop_upgradebolts$", "upgradebolts", Descriptions::ballista_ammo_upgrade_gold, false);
-		s.spawnNothing = true;
+		ShopItem@ s = addShopItem(this, "Explosive Bolts", "$mat_explosive_bolts$", "mat_explosive_bolts", "$mat_explosive_bolts$\n\n\n" + Descriptions::ballista_ammo_explosive, false);
+		s.crate_icon = 5;
 		s.customButton = true;
 		s.buttonwidth = 2;
 		s.buttonheight = 1;
-		AddRequirement(s.requirements, "blob", "mat_gold", "Gold", CTFCosts::ballista_ammo_upgrade_gold);
-		AddRequirement(s.requirements, "not tech", "bomb ammo", "Bomb Bolt", 1);
+		AddRequirement(s.requirements, "coin", "", "Coins", CTFCosts::ballista_ammo_explosive);
+		//AddRequirement(s.requirements, "blob", "mat_gold", "Gold", CTFCosts::ballista_ammo_upgrade_gold);
+		//AddRequirement(s.requirements, "not tech", "bomb ammo", "Bomb Bolt", 1);
 	}
 }
 
@@ -75,6 +76,7 @@ void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 		{
 			return;
 		}
+		/*
 		string name = params.read_string();
 		{
 			if (name == "upgradebolts")
@@ -82,5 +84,6 @@ void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 				GiveFakeTech(getRules(), "bomb ammo", this.getTeamNum());
 			}
 		}
+		*/
 	}
 }
