@@ -401,21 +401,6 @@ bool Vehicle_AddLoadAmmoButton(CBlob@ this, CBlob@ caller)
 
 void Fire(CBlob@ this, VehicleInfo@ v, CBlob@ caller, const u8 charge)
 {
-	bool should_fire = true;
-	if (this.get_bool("bomb ammo")) // if its trying to fire explosive bolts then it should check if it has any first
-	{
-		should_fire = false;
-		for (int i = 0; i < this.getInventory().getItemsCount(); i++)
-		{
-			CBlob@ invItem = this.getInventory().getItem(i);
-			if (invItem.getName() == "mat_explosive_bolts")
-			{
-				should_fire = true;
-			}
-		}
-	}
-	if (!should_fire) return;
-
 	// normal fire
 	if (canFireIgnoreFiring(this, v) && caller !is null)
 	{
