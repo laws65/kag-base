@@ -35,6 +35,8 @@ const u8 cooldown_time = 90;
 const f32 high_angle = 20.0f;
 const f32 low_angle = 60.0f;
 
+uint explosive_bolts = 0;
+
 void onInit(CBlob@ this)
 {
 	this.Tag("respawn");
@@ -59,9 +61,8 @@ void onInit(CBlob@ this)
 	v.max_cooldown_time = cooldown_time;
 
 	//tech - bomb bolts
-	bool hasBomb = hasTech(this, "bomb ammo");
+	bool hasBomb = false;
 	this.set_bool("bomb ammo", hasBomb);
-
 	Vehicle_SetupWeapon(this, v,
 	                    cooldown_time, // fire delay (ticks)
 	                    1, // fire bullets amount
@@ -249,6 +250,7 @@ void GetButtonsFor(CBlob@ this, CBlob@ caller)
 		{
 			Vehicle_AddLoadAmmoButton(this, caller);
 		}
+		AddSwapAmmoButton(this, caller);
 	}
 }
 
@@ -275,8 +277,57 @@ void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 			warn("Attempted to launch invalid object!");
 			return;
 		}
-		
+		if (this.get_bool("bomb ammo") && explosive_bolts <= 0)
+		{
+			return;
+		}
+		else
+		{
 		Vehicle_onFire(this, v, blob, charge);
+		}
+	}
+	else if (cmd == this.getCommandID("switch_ammo_type"))
+	{
+		this.set_bool("bomb ammo", !this.get_bool("bomb ammo")); // inverts bool
+	}
+	else if (cmd == this.getCommandID("load_ammo"))
+	{
+		CBlob@ caller = getBlobByNetworkID(params.read_u16());
+		VehicleInfo@ v;
+		if (caller !is null)
+		{
+			uint ammo_to_load;
+			array < CBlob@ > ammos;
+			CBlob@ carryObject = caller.getCarriedBlob();
+			if (carryObject !is null && carryObject.getName() == "mat_explosive_bolts")
+			{
+				ammos.push_back(carryObject);
+				ammo_to_load += carryObject.getQuantity();
+			}
+			else if (carryObject !is null && carryObject.getName() == "mat_bolts") // should only load explosive bolts here
+			{
+				return;
+			}
+			for (int i = 0; i < caller.getInventory().getItemsCount(); i++)
+			{
+				CBlob@ invItem = caller.getInventory().getItem(i);
+				if (invItem.getName() == "mat_explosive_bolts")
+				{
+					ammos.push_back(invItem);
+					ammo_to_load += invItem.getQuantity();
+				}
+			}
+
+			for (int i = 0; i < ammos.length; i++)
+			{
+				if (!this.server_PutInInventory(ammos[i]))
+				{
+					caller.server_PutInInventory(ammos[i]);
+				}
+			}
+
+			//RecountAmmo(this, v);
+		}
 	}
 }
 
@@ -312,6 +363,7 @@ void Vehicle_onFire(CBlob@ this, VehicleInfo@ v, CBlob@ bullet, const u8 _charge
 {
 	if (bullet !is null)
 	{
+
 		u8 charge_prop = _charge;
 
 		f32 charge = 5.0f + 15.0f * (float(charge_prop) / float(v.max_charge_time));
@@ -323,6 +375,7 @@ void Vehicle_onFire(CBlob@ this, VehicleInfo@ v, CBlob@ bullet, const u8 _charge
 
 		if (this.get_bool("bomb ammo"))
 		{
+			explosive_bolts--;
 			bullet.Tag("bomb ammo");
 			bullet.Sync("bomb ammo", true);
 		}
@@ -397,4 +450,17 @@ bool isOverlapping(CBlob@ this, CBlob@ blob)
 	       && _br.x > tl.x
 	       && _br.y > tl.y;
 
+}
+
+
+void AddSwapAmmoButton(CBlob@ this, CBlob@ caller)
+{
+	CBitStream params;
+	caller.CreateGenericButton(
+		"$change_class$",                           // icon
+		Vec2f(8.0f, 1.0f),                          // offset
+		this,                                       // attachment
+		this.getCommandID("switch_ammo_type"),      // command id
+		getTranslatedString("Switch Ammo Type"),    // description
+		params);                                    // bit stream
 }

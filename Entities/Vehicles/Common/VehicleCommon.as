@@ -99,6 +99,7 @@ void Vehicle_Setup(CBlob@ this,
 	this.addCommandID("vehicle getout");
 	this.addCommandID("reload");
 	this.addCommandID("recount ammo");
+	this.addCommandID("switch_ammo_type");
 	this.Tag("vehicle");
 	this.getShape().getConsts().collideWhenAttached = false;
 	AttachmentPoint@ mag = getMagAttachmentPoint(this);
@@ -336,6 +337,10 @@ bool MakeLoadAmmoButton(CBlob@ this, CBlob@ caller, Vec2f offset, VehicleInfo@ v
 				{
 					@ammoBlob = held;
 				}
+				else if (v.ammo_name == "mat_bolts" && held.getName() == "mat_explosive_bolts")
+				{
+					@ammoBlob = held;
+				}
 			}
 		}
 
@@ -396,6 +401,21 @@ bool Vehicle_AddLoadAmmoButton(CBlob@ this, CBlob@ caller)
 
 void Fire(CBlob@ this, VehicleInfo@ v, CBlob@ caller, const u8 charge)
 {
+	bool should_fire = true;
+	if (this.get_bool("bomb ammo")) // if its trying to fire explosive bolts then it should check if it has any first
+	{
+		should_fire = false;
+		for (int i = 0; i < this.getInventory().getItemsCount(); i++)
+		{
+			CBlob@ invItem = this.getInventory().getItem(i);
+			if (invItem.getName() == "mat_explosive_bolts")
+			{
+				should_fire = true;
+			}
+		}
+	}
+	if (!should_fire) return;
+
 	// normal fire
 	if (canFireIgnoreFiring(this, v) && caller !is null)
 	{
