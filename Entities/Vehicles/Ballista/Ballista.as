@@ -35,7 +35,7 @@ const u8 cooldown_time = 90;
 const f32 high_angle = 20.0f;
 const f32 low_angle = 60.0f;
 
-uint explosive_bolts = 0;
+uint storedBolts = 0; // if shooting explosives then this is the number of normal bolts and vice versa
 
 void onInit(CBlob@ this)
 {
@@ -256,6 +256,11 @@ void GetButtonsFor(CBlob@ this, CBlob@ caller)
 
 void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 {
+	VehicleInfo@ v;
+	if (!this.get("VehicleInfo", @v))
+	{
+		return;
+	}
 	if (cmd == SpawnCmd::changeClass)
 	{
 		onRespawnCommand(this, cmd, params);
@@ -264,45 +269,33 @@ void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 	{
 		CBlob@ blob = getBlobByNetworkID(params.read_netid());
 		const u8 charge = params.read_u8();
-		
-		VehicleInfo@ v;
-		if (!this.get("VehicleInfo", @v))
-		{
-			return;
-		}
-		
+
 		// check for valid ammo
 		if (blob.getName() != v.bullet_name){
 			// output warning
 			warn("Attempted to launch invalid object!");
 			return;
 		}
-		if (this.get_bool("bomb ammo") && explosive_bolts <= 0)
-		{
-			return;
-		}
 		else
 		{
-		Vehicle_onFire(this, v, blob, charge);
+			Vehicle_onFire(this, v, blob, charge);
 		}
 	}
 	else if (cmd == this.getCommandID("switch_ammo_type"))
 	{
-		this.set_bool("bomb ammo", !this.get_bool("bomb ammo")); // inverts bool
+		InvertAmmo(this, params, v);
 	}
 	else if (cmd == this.getCommandID("load_ammo"))
 	{
 		CBlob@ caller = getBlobByNetworkID(params.read_u16());
-		VehicleInfo@ v;
 		if (caller !is null)
 		{
-			uint ammo_to_load;
+			const string ammoName = "mat_explosive_bolts";
 			array < CBlob@ > ammos;
 			CBlob@ carryObject = caller.getCarriedBlob();
-			if (carryObject !is null && carryObject.getName() == "mat_explosive_bolts")
+			if (carryObject !is null && carryObject.getName() == ammoName)
 			{
 				ammos.push_back(carryObject);
-				ammo_to_load += carryObject.getQuantity();
 			}
 			else if (carryObject !is null && carryObject.getName() == "mat_bolts") // should only load explosive bolts here
 			{
@@ -311,10 +304,9 @@ void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 			for (int i = 0; i < caller.getInventory().getItemsCount(); i++)
 			{
 				CBlob@ invItem = caller.getInventory().getItem(i);
-				if (invItem.getName() == "mat_explosive_bolts")
+				if (invItem.getName() == ammoName)
 				{
 					ammos.push_back(invItem);
-					ammo_to_load += invItem.getQuantity();
 				}
 			}
 
@@ -325,8 +317,21 @@ void onCommand(CBlob@ this, u8 cmd, CBitStream @params)
 					caller.server_PutInInventory(ammos[i]);
 				}
 			}
-
-			//RecountAmmo(this, v);
+			for (int i = 0; i < this.getInventory().getItemsCount(); i++)
+			{
+				CBlob@ invItem = this.getInventory().getItem(i);
+				if (invItem.getName() == ammoName)
+				{
+					if (this.get_bool("bomb ammo"))
+					{
+						v.loaded_ammo += invItem.getQuantity();
+					}
+					else
+					{
+						storedBolts += invItem.getQuantity();
+					}
+				}
+			}
 		}
 	}
 }
@@ -375,7 +380,6 @@ void Vehicle_onFire(CBlob@ this, VehicleInfo@ v, CBlob@ bullet, const u8 _charge
 
 		if (this.get_bool("bomb ammo"))
 		{
-			explosive_bolts--;
 			bullet.Tag("bomb ammo");
 			bullet.Sync("bomb ammo", true);
 		}
@@ -452,15 +456,36 @@ bool isOverlapping(CBlob@ this, CBlob@ blob)
 
 }
 
-
 void AddSwapAmmoButton(CBlob@ this, CBlob@ caller)
 {
+	string icon;
 	CBitStream params;
+	if (this.get_bool("bomb ammo"))
+	{
+		icon = "$mat_explosive_bolts$";
+	}
+	else
+	{
+		icon = "$mat_bolts$";
+	}
 	caller.CreateGenericButton(
-		"$change_class$",                           // icon
+		icon,                           // icon
 		Vec2f(8.0f, 1.0f),                          // offset
 		this,                                       // attachment
 		this.getCommandID("switch_ammo_type"),      // command id
 		getTranslatedString("Switch Ammo Type"),    // description
 		params);                                    // bit stream
+}
+
+void InvertAmmo(CBlob@ this, CBitStream params, VehicleInfo@ v)
+{
+	if (!this.get("VehicleInfo", @v))
+	{
+		return;
+	}
+	uint placeHolder = v.loaded_ammo;
+	v.loaded_ammo = storedBolts;
+	storedBolts = placeHolder;
+	params.write_u16(v.ammo_stocked);
+	this.set_bool("bomb ammo", !this.get_bool("bomb ammo"));
 }
